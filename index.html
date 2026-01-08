@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Brotes Musicales - Controlador MIDI</title>
+    <style>
+        :root {
+            --bg-color: #1a1a1a;
+            --panel-color: #2b2b2b;
+            --text-color: #e0e0e0;
+            --accent-color: #00ff9d;
+            --secondary-accent: #ff0055;
+            --warning-color: #ffaa00;
+            --key-inactive: #3a3a3a;
+            --key-active: #00ff9d;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            user-select: none; /* Evitar selección de texto al tocar rápido */
+        }
+
+        /* Header */
+        header {
+            background-color: var(--panel-color);
+            padding: 20px;
+            text-align: center;
+            border-bottom: 2px solid #444;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+
+        h1 {
+            margin: 0;
+            font-weight: 300;
+            letter-spacing: 2px;
+            font-size: 1.5rem;
+            color: var(--accent-color);
+        }
+
+        .subtitle {
+            font-size: 0.9rem;
+            color: #888;
+            margin-top: 5px;
+        }
+
+        /* Panel de Configuración MIDI */
+        .midi-setup {
+            background-color: #222;
+            padding: 15px;
+            text-align: center;
+            border-bottom: 1px solid #333;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .midi-controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            justify-content: center;
+        }
+
+        select {
+            background: #333;
+            color: white;
+            padding: 8px 15px;
+            border: 1px solid #555;
+            border-radius: 4px;
+            font-size: 1rem;
+            outline: none;
+            cursor: pointer;
+            min-width: 200px;
+        }
+
+        select:hover {
+            border-color: var(--accent-color);
+        }
+
+        button.refresh-btn {
+            background: #444;
+            color: white;
+            border: 1px solid #555;
+            padding: 8px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        button.refresh-btn:hover {
+            background: #555;
+            border-color: var(--accent-color);
+        }
+
+        /* Contenedor Principal */
+        main {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start; /* Alineación superior para mejor distribución */
+            padding: 20px;
+            flex-wrap: wrap;
+            gap: 40px;
+        }
+
+        /* Grupo de Controles */
+        .control-group {
+            background: var(--panel-color);
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.5);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .group-title {
+            margin-bottom: 20px;
+            font-weight: bold;
+            color: #888;
+            text-transform: uppercase;
+            font-size: 0.8rem;
+            letter-spacing: 1px;
+        }
+
+        /* Estilos de las Teclas/Pads */
+        .d-pad-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            grid-template-rows: repeat(2, 1fr);
+            gap: 10px;
+            align-items: center;
+            justify-items: center;
+        }
+
+        .linear-grid {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap; /* Permitir que bajen de línea si es necesario */
+            justify-content: center;
+            max-width: 650px; /* Limitar ancho para que no se extienda demasiado */
+        }
+
+        .key-pad {
+            width: 90px;
+            height: 90px;
+            background-color: var(--key-inactive);
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            transition: all 0.1s ease;
+            border: 1px solid #444;
+        }
+
+        /* Posicionamiento de flechas */
+        .arrow-up { grid-column: 2; grid-row: 1; }
+        .arrow-left { grid-column: 1; grid-row: 2; }
+        .arrow-down { grid-column: 2; grid-row: 2; }
+        .arrow-right { grid-column: 3; grid-row: 2; }
+
+        /* Estado Activo (cuando se toca) */
+        .key-pad.active {
+            background-color: var(--key-active);
+            color: #000;
+            transform: translateY(2px);
+            box-shadow: 0 0 15px var(--accent-color);
+            border-color: var(--accent-color);
+        }
+        
+        .key-pad.active .key-icon {
+            color: #000;
+        }
+
+        .key-pad.active select {
+            border-color: #000;
+            color: #000;
+            background: rgba(255,255,255,0.3);
+        }
+
+        /* Iconos y Selectores dentro de las teclas */
+        .key-icon {
+            font-size: 1.5rem;
+            font-weight: bold;
+            margin-bottom: 5px;
+            color: #fff;
+        }
+
+        .note-selector {
+            width: 80%;
+            background: rgba(0,0,0,0.3);
+            border: none;
+            color: #ccc;
+            font-size: 0.8rem;
+            text-align: center;
+            border-radius: 4px;
+            padding: 2px;
+        }
+
+        /* Footer */
+        footer {
+            background-color: #111;
+            color: #666;
+            text-align: center;
+            padding: 15px;
+            font-size: 0.85rem;
+            border-top: 1px solid #333;
+        }
+
+        .heart {
+            color: var(--secondary-accent);
+        }
+
+        /* Indicador de estado MIDI */
+        #midi-status {
+            font-size: 0.8rem;
+            margin-top: 5px;
+            color: var(--secondary-accent); /* Default error/disconnected */
+            max-width: 600px;
+            line-height: 1.4;
+        }
+        #midi-status.connected {
+            color: var(--accent-color);
+        }
+        #midi-status.scanning {
+            color: #fbff00;
+        }
+
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>CONTROLADOR MAKEY - MIDI</h1>
+        <div class="subtitle">Interfaz para Ableton Live</div>
+    </header>
+
+    <!-- Configuración MIDI Global -->
+    <div class="midi-setup">
+        <label for="midiOutput" style="font-size: 0.9rem; color: #aaa;">Salida MIDI:</label>
+        <div class="midi-controls">
+            <select id="midiOutput">
+                <option value="">Esperando permisos...</option>
+            </select>
+            <button class="refresh-btn" onclick="initMidi()" title="Buscar dispositivos nuevamente">🔄</button>
+        </div>
+        <div id="midi-status">Estado: Iniciando...</div>
+    </div>
+
+    <main>
+        <!-- Grupo 1: Flechas Direccionales -->
+        <div class="control-group">
+            <div class="group-title">Direccionales</div>
+            <div class="d-pad-grid">
+                <!-- Arriba -->
+                <div class="key-pad arrow-up" id="pad-ArrowUp">
+                    <div class="key-icon">↑</div>
+                    <select class="note-selector" data-key="ArrowUp">
+                        <!-- Opciones se llenan con JS -->
+                    </select>
+                </div>
+                <!-- Izquierda -->
+                <div class="key-pad arrow-left" id="pad-ArrowLeft">
+                    <div class="key-icon">←</div>
+                    <select class="note-selector" data-key="ArrowLeft">
+                    </select>
+                </div>
+                <!-- Abajo -->
+                <div class="key-pad arrow-down" id="pad-ArrowDown">
+                    <div class="key-icon">↓</div>
+                    <select class="note-selector" data-key="ArrowDown">
+                    </select>
+                </div>
+                <!-- Derecha -->
+                <div class="key-pad arrow-right" id="pad-ArrowRight">
+                    <div class="key-icon">→</div>
+                    <select class="note-selector" data-key="ArrowRight">
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- Grupo 2: Letras y Back Header (W, A, S, D, F, G) -->
+        <div class="control-group">
+            <div class="group-title">Letras (Teclado/Back Header)</div>
+            <div class="linear-grid">
+                
+                <!-- W (Agregado) -->
+                <div class="key-pad" id="pad-w">
+                    <div class="key-icon">W</div>
+                    <select class="note-selector" data-key="w">
+                    </select>
+                </div>
+
+                <!-- A -->
+                <div class="key-pad" id="pad-a">
+                    <div class="key-icon">A</div>
+                    <select class="note-selector" data-key="a">
+                    </select>
+                </div>
+                
+                <!-- S -->
+                <div class="key-pad" id="pad-s">
+                    <div class="key-icon">S</div>
+                    <select class="note-selector" data-key="s">
+                    </select>
+                </div>
+                
+                <!-- D -->
+                <div class="key-pad" id="pad-d">
+                    <div class="key-icon">D</div>
+                    <select class="note-selector" data-key="d">
+                    </select>
+                </div>
+
+                <!-- F (Agregado) -->
+                <div class="key-pad" id="pad-f">
+                    <div class="key-icon">F</div>
+                    <select class="note-selector" data-key="f">
+                    </select>
+                </div>
+
+                <!-- G (Agregado) -->
+                <div class="key-pad" id="pad-g">
+                    <div class="key-icon">G</div>
+                    <select class="note-selector" data-key="g">
+                    </select>
+                </div>
+
+            </div>
+        </div>
+    </main>
+
+    <footer>
+        Creado por Manuel Puebla - Brotes Musicales
+    </footer>
+
+    <script>
+        // --- CONFIGURACIÓN GLOBAL ---
+        let midiAccess = null;
+        let selectedOutput = null;
+        const channel = 0; // Canal MIDI 1 (0-15)
+        const velocity = 127; // Volumen máximo
+
+        // Diccionario de Notas MIDI (C3 = 60)
+        const midiNotes = [];
+        const noteNames = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+        
+        for (let i = 48; i <= 84; i++) { // Rango de C2 a C5
+            const octave = Math.floor(i / 12) - 1;
+            const noteName = noteNames[i % 12];
+            midiNotes.push({ number: i, name: `${noteName}${octave}` });
+        }
+
+        // Configuración inicial de mapeo
+        const keyMap = {
+            'ArrowUp': 60,    // C4 
+            'ArrowDown': 62,  // D4
+            'ArrowLeft': 64,  // E4
+            'ArrowRight': 65, // F4
+            'w': 72,          // C5 (Nueva - Octava arriba de C4)
+            'a': 67,          // G4
+            's': 69,          // A4
+            'd': 71,          // B4
+            'f': 74,          // D5 (Nueva)
+            'g': 76           // E5 (Nueva)
+        };
+
+        const activeKeys = {};
+
+        // --- INICIALIZACIÓN ---
+
+        window.addEventListener('load', () => {
+            initMidi();
+            populateDropdowns();
+        });
+
+        // 1. Inicializar Web MIDI API
+        function initMidi() {
+            const statusDiv = document.getElementById('midi-status');
+            statusDiv.innerText = "Buscando permisos y dispositivos...";
+            statusDiv.className = "scanning";
+
+            if (navigator.requestMIDIAccess) {
+                navigator.requestMIDIAccess({ sysex: false })
+                    .then(onMIDISuccess, onMIDIFailure);
+            } else {
+                statusDiv.innerText = "Navegador no compatible. Usa Chrome.";
+                statusDiv.className = "";
+            }
+        }
+
+        function onMIDISuccess(access) {
+            midiAccess = access;
+            const statusDiv = document.getElementById('midi-status');
+            statusDiv.innerText = "Permiso concedido. Buscando puertos...";
+            
+            updateOutputList();
+            
+            // Escuchar cambios de conexión en vivo
+            midiAccess.onstatechange = (e) => {
+                console.log("Cambio en puertos MIDI:", e.port.name, e.port.state);
+                updateOutputList();
+            };
+        }
+
+        function onMIDIFailure(msg) {
+            const statusDiv = document.getElementById('midi-status');
+            console.error("Fallo MIDI:", msg);
+
+            if (msg.toString().includes("permissions policy")) {
+                statusDiv.innerHTML = "⚠️ <strong>Entorno Restringido:</strong> La vista previa bloquea MIDI.<br>Por favor, descarga el archivo HTML y ábrelo directamente en tu navegador.";
+                statusDiv.style.color = "var(--warning-color)";
+            } else if (msg.name === "SecurityError") {
+                statusDiv.innerHTML = "⚠️ <strong>Seguridad:</strong> Bloqueado por el navegador. Asegúrate de usar HTTPS o localhost.";
+                statusDiv.style.color = "var(--warning-color)";
+            } else {
+                statusDiv.innerText = "⚠️ Error: Permiso denegado o fallo del sistema.";
+                statusDiv.style.color = "var(--secondary-accent)";
+            }
+        }
+
+        // 2. Llenar lista de dispositivos de salida
+        function updateOutputList() {
+            const select = document.getElementById('midiOutput');
+            const statusDiv = document.getElementById('midi-status');
+            
+            const previousSelection = select.value;
+            select.innerHTML = ""; 
+
+            const outputs = Array.from(midiAccess.outputs.values());
+            
+            if (outputs.length === 0) {
+                const option = document.createElement('option');
+                option.text = "⚠️ No se detectan puertos MIDI";
+                select.appendChild(option);
+                statusDiv.innerText = "Error: Verifica 'Configuración Audio MIDI' (Mac) o loopMIDI (PC)";
+                statusDiv.className = "";
+                statusDiv.style.color = "var(--secondary-accent)";
+                selectedOutput = null;
+                return;
+            }
+
+            outputs.forEach(output => {
+                const option = document.createElement('option');
+                option.value = output.id;
+                option.text = output.name + (output.state === "connected" ? " (Online)" : " (Offline)");
+                select.appendChild(option);
+            });
+
+            if (previousSelection && outputs.some(o => o.id === previousSelection)) {
+                select.value = previousSelection;
+            } else {
+                let preferredIndex = 0;
+                for (let i = 0; i < select.options.length; i++) {
+                    const txt = select.options[i].text.toLowerCase();
+                    if (txt.includes("iac") || txt.includes("loop") || txt.includes("virtual")) {
+                        preferredIndex = i;
+                        break;
+                    }
+                }
+                select.selectedIndex = preferredIndex;
+            }
+            
+            selectOutputDevice(select.value);
+
+            statusDiv.innerText = "✅ Listo. Conectado a: " + select.options[select.selectedIndex].text;
+            statusDiv.className = "connected";
+            statusDiv.style.color = "var(--accent-color)";
+
+            select.onchange = (e) => selectOutputDevice(e.target.value);
+        }
+
+        function selectOutputDevice(id) {
+            if (!midiAccess) return;
+            selectedOutput = midiAccess.outputs.get(id);
+            if(selectedOutput) {
+                console.log("Salida conectada a:", selectedOutput.name);
+            }
+        }
+
+        // 3. Llenar los selectores
+        function populateDropdowns() {
+            const selectors = document.querySelectorAll('.note-selector');
+            selectors.forEach(sel => {
+                const mappedKey = sel.getAttribute('data-key');
+                
+                midiNotes.forEach(note => {
+                    const opt = document.createElement('option');
+                    opt.value = note.number;
+                    opt.text = `${note.name} (${note.number})`;
+                    if (note.number === keyMap[mappedKey]) {
+                        opt.selected = true;
+                    }
+                    sel.appendChild(opt);
+                });
+
+                sel.addEventListener('change', (e) => {
+                    keyMap[mappedKey] = parseInt(e.target.value);
+                    sel.blur(); 
+                });
+            });
+        }
+
+        // --- INPUT & MIDI ---
+
+        document.addEventListener('keydown', (e) => {
+            const key = e.key;
+            // Verificar si es una de nuestras teclas mapeadas
+            if (keyMap.hasOwnProperty(key) && !activeKeys[key]) {
+                activeKeys[key] = true;
+                playNote(keyMap[key]);
+                visualFeedback(key, true);
+            }
+        });
+
+        document.addEventListener('keyup', (e) => {
+            const key = e.key;
+            if (keyMap.hasOwnProperty(key)) {
+                activeKeys[key] = false;
+                stopNote(keyMap[key]);
+                visualFeedback(key, false);
+            }
+        });
+
+        function playNote(noteNumber) {
+            if (selectedOutput) {
+                const noteOnMessage = [0x90 + channel, noteNumber, velocity];
+                selectedOutput.send(noteOnMessage);
+            }
+        }
+
+        function stopNote(noteNumber) {
+            if (selectedOutput) {
+                const noteOffMessage = [0x80 + channel, noteNumber, 0];
+                selectedOutput.send(noteOffMessage);
+            }
+        }
+
+        function visualFeedback(keyName, isActive) {
+            let domId = 'pad-' + keyName;
+            const element = document.getElementById(domId);
+            if (element) {
+                if (isActive) {
+                    element.classList.add('active');
+                } else {
+                    element.classList.remove('active');
+                }
+            }
+        }
+    </script>
+</body>
+</html>
