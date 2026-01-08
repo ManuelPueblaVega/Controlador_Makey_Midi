@@ -105,7 +105,7 @@
             flex: 1;
             display: flex;
             justify-content: center;
-            align-items: flex-start; /* Alineación superior para mejor distribución */
+            align-items: flex-start;
             padding: 20px;
             flex-wrap: wrap;
             gap: 40px;
@@ -144,9 +144,9 @@
         .linear-grid {
             display: flex;
             gap: 15px;
-            flex-wrap: wrap; /* Permitir que bajen de línea si es necesario */
+            flex-wrap: wrap;
             justify-content: center;
-            max-width: 650px; /* Limitar ancho para que no se extienda demasiado */
+            max-width: 650px;
         }
 
         .key-pad {
@@ -161,6 +161,11 @@
             position: relative;
             transition: all 0.1s ease;
             border: 1px solid #444;
+        }
+
+        /* Estilo especial para barra espaciadora */
+        .key-pad.wide {
+            width: 200px; /* Más ancho */
         }
 
         /* Posicionamiento de flechas */
@@ -294,51 +299,56 @@
         <div class="control-group">
             <div class="group-title">Letras (Teclado/Back Header)</div>
             <div class="linear-grid">
-                
-                <!-- W (Agregado) -->
+                <!-- W -->
                 <div class="key-pad" id="pad-w">
                     <div class="key-icon">W</div>
-                    <select class="note-selector" data-key="w">
-                    </select>
+                    <select class="note-selector" data-key="w"></select>
                 </div>
-
                 <!-- A -->
                 <div class="key-pad" id="pad-a">
                     <div class="key-icon">A</div>
-                    <select class="note-selector" data-key="a">
-                    </select>
+                    <select class="note-selector" data-key="a"></select>
                 </div>
-                
                 <!-- S -->
                 <div class="key-pad" id="pad-s">
                     <div class="key-icon">S</div>
-                    <select class="note-selector" data-key="s">
-                    </select>
+                    <select class="note-selector" data-key="s"></select>
                 </div>
-                
                 <!-- D -->
                 <div class="key-pad" id="pad-d">
                     <div class="key-icon">D</div>
-                    <select class="note-selector" data-key="d">
-                    </select>
+                    <select class="note-selector" data-key="d"></select>
                 </div>
-
-                <!-- F (Agregado) -->
+                <!-- F -->
                 <div class="key-pad" id="pad-f">
                     <div class="key-icon">F</div>
-                    <select class="note-selector" data-key="f">
-                    </select>
+                    <select class="note-selector" data-key="f"></select>
                 </div>
-
-                <!-- G (Agregado) -->
+                <!-- G -->
                 <div class="key-pad" id="pad-g">
                     <div class="key-icon">G</div>
-                    <select class="note-selector" data-key="g">
-                    </select>
+                    <select class="note-selector" data-key="g"></select>
                 </div>
-
             </div>
         </div>
+
+        <!-- Grupo 3: Extras (Espacio y Click) -->
+        <div class="control-group">
+            <div class="group-title">Extras</div>
+            <div class="linear-grid">
+                <!-- Espacio -->
+                <div class="key-pad wide" id="pad-Space">
+                    <div class="key-icon">Espacio</div>
+                    <select class="note-selector" data-key="Space"></select>
+                </div>
+                <!-- Click -->
+                <div class="key-pad" id="pad-Click">
+                    <div class="key-icon" style="font-size: 1.2rem;">🖱️ Click</div>
+                    <select class="note-selector" data-key="Click"></select>
+                </div>
+            </div>
+        </div>
+
     </main>
 
     <footer>
@@ -349,7 +359,7 @@
         // --- CONFIGURACIÓN GLOBAL ---
         let midiAccess = null;
         let selectedOutput = null;
-        const channel = 0; // Canal MIDI 1 (0-15)
+        const channel = 0; // Canal MIDI 1
         const velocity = 127; // Volumen máximo
 
         // Diccionario de Notas MIDI (C3 = 60)
@@ -368,12 +378,14 @@
             'ArrowDown': 62,  // D4
             'ArrowLeft': 64,  // E4
             'ArrowRight': 65, // F4
-            'w': 72,          // C5 (Nueva - Octava arriba de C4)
+            'w': 72,          // C5
             'a': 67,          // G4
             's': 69,          // A4
             'd': 71,          // B4
-            'f': 74,          // D5 (Nueva)
-            'g': 76           // E5 (Nueva)
+            'f': 74,          // D5
+            'g': 76,          // E5
+            'Space': 77,      // F5 (Para la barra espaciadora)
+            'Click': 79       // G5 (Para el click del mouse)
         };
 
         const activeKeys = {};
@@ -407,7 +419,6 @@
             
             updateOutputList();
             
-            // Escuchar cambios de conexión en vivo
             midiAccess.onstatechange = (e) => {
                 console.log("Cambio en puertos MIDI:", e.port.name, e.port.state);
                 updateOutputList();
@@ -512,11 +523,14 @@
             });
         }
 
-        // --- INPUT & MIDI ---
+        // --- INPUT & MIDI (TECLADO) ---
 
         document.addEventListener('keydown', (e) => {
-            const key = e.key;
-            // Verificar si es una de nuestras teclas mapeadas
+            let key = e.key;
+            
+            // Normalizar "Space"
+            if (key === ' ') key = 'Space';
+
             if (keyMap.hasOwnProperty(key) && !activeKeys[key]) {
                 activeKeys[key] = true;
                 playNote(keyMap[key]);
@@ -525,13 +539,42 @@
         });
 
         document.addEventListener('keyup', (e) => {
-            const key = e.key;
+            let key = e.key;
+            
+            // Normalizar "Space"
+            if (key === ' ') key = 'Space';
+
             if (keyMap.hasOwnProperty(key)) {
                 activeKeys[key] = false;
                 stopNote(keyMap[key]);
                 visualFeedback(key, false);
             }
         });
+
+        // --- INPUT & MIDI (MOUSE CLICK) ---
+
+        document.addEventListener('mousedown', (e) => {
+            // EVITAR que suene si estamos interactuando con la interfaz (selectores, botones)
+            if (e.target.tagName === 'SELECT' || e.target.tagName === 'BUTTON') return;
+
+            const key = 'Click';
+            if (!activeKeys[key]) {
+                activeKeys[key] = true;
+                playNote(keyMap[key]);
+                visualFeedback(key, true);
+            }
+        });
+
+        document.addEventListener('mouseup', (e) => {
+            const key = 'Click';
+            if (activeKeys[key]) {
+                activeKeys[key] = false;
+                stopNote(keyMap[key]);
+                visualFeedback(key, false);
+            }
+        });
+
+        // --- FUNCIONES COMUNES ---
 
         function playNote(noteNumber) {
             if (selectedOutput) {
